@@ -110,11 +110,11 @@ function deleteDOM(fiber, domParent) {
   }
 }
 
-function mount(FC, container) {
+function mount(vdom, container) {
   wipRootFiber = {
     dom: container,
     props: {
-      children: [FC]
+      children: [vdom]
     },
     oldFiber: currentRootFiber
   };
@@ -297,7 +297,7 @@ function Counter() {
     </div>
   );
 }
-const fc = <Counter />;
-console.log(fc)
+const vdom = <Counter />;
+console.log(vdom)
 const container = document.getElementById("root");
-Didact.mount(fc, container);
+Didact.mount(vdom, container);
