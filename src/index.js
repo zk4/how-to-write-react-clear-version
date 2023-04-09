@@ -1,5 +1,10 @@
-function createVDOM(type, props, ...children) {
-  return {
+// 这个函数是由 babel 调用.由开发者提供. 在 react 里就应该由 react 提供. children 之所以在 props 里.也是因为 react 里就是这样写的.
+// 在 babel 转换 JSX 时,   
+// type 在函数式组件里, 指的是函数本身
+// props 指的是 JSX 上的 attribute 
+// 从第3 个起后的参数都是 childlren  vDOM
+function JSX2VDOM(type, props, ...children) {
+  const vdom = {
     type,
     props: {
       ...props,
@@ -8,6 +13,8 @@ function createVDOM(type, props, ...children) {
       )
     }
   };
+  console.log("vodm",vdom)
+  return vdom;
 }
 
 function createTextElement(text) {
@@ -274,18 +281,18 @@ function diffAndPatch(wipFiber, vDOMs) {
 }
 
 const Didact = {
-  createVDOM,
+  JSX2VDOM,
   mount,
   useState
 };
 
-/** @jsx Didact.createVDOM */
+/** @jsx Didact.JSX2VDOM */
 function Counter() {
   const [state, setState] = Didact.useState(1);
   const [state2, setState2] = Didact.useState(1);
 
   return (
-    <div>
+    <div align="middle">
      Example 1: explains why we need queue in useState
     <h1 onClick={() => {setState(c => c + 1); setState(c => c + 1);}} style="user-select: none">
       Count: {state}
