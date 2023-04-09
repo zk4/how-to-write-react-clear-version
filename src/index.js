@@ -1,15 +1,15 @@
-// 这个函数是由 babel 调用.由开发者提供. 在 react 里就应该由 react 提供. children 之所以在 props 里.也是因为 react 里就是这样写的.
-// 在 babel 转换 JSX 时,   
-// type 在函数式组件里, 指的是函数本身
+// 这个函数是由 babel 调用.由开发者提供. Babel 将 JSX 转换后形成参数传入
+// children 之所以在 props 里.也是因为 react 里就是这样写的. 也对应最早的 h 函数.
+// type 在函数式组件里, Babel 会将函数本身赋值给 type
 // props 指的是 JSX 上的 attribute 
 // 从第3 个起后的参数都是 childlren  vDOM
-function JSX2VDOM(type, props, ...children) {
+function createVNode(type, props, ...children) {
   const vdom = {
     type,
     props: {
       ...props,
       children: children.map(child =>
-        typeof child === "object" ? child : createTextElement(child)
+        typeof child === "object" ? child : createTextVNode(child)
       )
     }
   };
@@ -17,7 +17,7 @@ function JSX2VDOM(type, props, ...children) {
   return vdom;
 }
 
-function createTextElement(text) {
+function createTextVNode(text) {
   return {
     type: "TEXT_ELEMENT",
     props: {
@@ -281,12 +281,12 @@ function diffAndPatch(wipFiber, vDOMs) {
 }
 
 const Didact = {
-  JSX2VDOM,
+  createVNode,
   mount,
   useState
 };
 
-/** @jsx Didact.JSX2VDOM */
+/** @jsx Didact.createVNode */
 function Counter() {
   const [state, setState] = Didact.useState(1);
   const [state2, setState2] = Didact.useState(1);
