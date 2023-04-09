@@ -78,16 +78,17 @@ function rootFiberToDOM() {
   wipRootFiber = null;
 }
 
+// 这个函数主要是利用在 fiber diff 后的信息.
 function fiberToDOM(fiber) {
   if (!fiber) {
     return;
   }
 
-  let domParentFiber = fiber.parentFiber;
-  while (!domParentFiber.dom) {
-    domParentFiber = domParentFiber.parentFiber;
+  let parentFilber = fiber.parentFiber;
+  while (!parentFilber.dom) {
+    parentFilber = parentFilber.parentFiber;
   }
-  const domParent = domParentFiber.dom;
+  const domParent = parentFilber.dom;
 
   if (fiber.effectTag === "PLACEMENT" && fiber.dom != null) {
     domParent.appendChild(fiber.dom);
@@ -109,11 +110,11 @@ function deleteDOM(fiber, domParent) {
   }
 }
 
-function mount(vDOM, container) {
+function mount(FC, container) {
   wipRootFiber = {
     dom: container,
     props: {
-      children: [vDOM]
+      children: [FC]
     },
     oldFiber: currentRootFiber
   };
@@ -129,7 +130,7 @@ let fibersToDelete = null;
 function workLoop(deadline) {
   let shouldYield = false;
   while (nextFiber && !shouldYield) {
-    nextFiber = doFiber(nextFiber);
+    nextFiber = doOneFiber(nextFiber);
     shouldYield = deadline.timeRemaining() < 1;
   }
 
@@ -142,21 +143,24 @@ function workLoop(deadline) {
 
 requestIdleCallback(workLoop);
 
-function doFiber(fiber) {
+function doOneFiber(fiber) {
   const isFunctionComponent = fiber.type instanceof Function;
   if (isFunctionComponent) {
     updateFunctionComponent(fiber);
   } else {
     updateHostComponent(fiber);
   }
+  // 如果有孩子,直接返回孩子为下一个 work
   if (fiber.child) {
     return fiber.child;
   }
   let nextFiber = fiber;
   while (nextFiber) {
+    //1. 如果有兄弟,则返回兄弟
     if (nextFiber.sibling) {
       return nextFiber.sibling;
     }
+    //2. 找到父 fiber, 回到 1
     nextFiber = nextFiber.parentFiber;
   }
 }
@@ -169,11 +173,19 @@ function updateFunctionComponent(fiber) {
   wipFiber = fiber;
   hookIndex = 0;
   wipFiber.hooks = [];
-  console.log(fiber.props,fiber.type)
+  // console.log(fiber.props,fiber.type)
   // 当是 function component 时, fiber.type 就是这个函数,比如 Counter(){}
   // children 就是 vdom
-  const children = [fiber.type(fiber.props)];
-  diffAndPatch(fiber, children);
+  const childrenVDOMs = [fiber.type(fiber.props)];
+
+  diffAndPatch(fiber, childrenVDOMs);
+}
+
+function updateHostComponent(fiber) {
+  if (!fiber.dom) {
+    fiber.dom = createDom(fiber);
+  }
+  diffAndPatch(fiber, fiber.props.children);
 }
 
 function useState(initial) {
@@ -208,13 +220,6 @@ function useState(initial) {
   wipFiber.hooks.push(hook);
   hookIndex++;
   return [hook.state, setState];
-}
-
-function updateHostComponent(fiber) {
-  if (!fiber.dom) {
-    fiber.dom = createDom(fiber);
-  }
-  diffAndPatch(fiber, fiber.props.children);
 }
 
 function diffAndPatch(wipFiber, vDOMs) {
@@ -292,6 +297,7 @@ function Counter() {
     </div>
   );
 }
-const vDOM = <Counter />;
+const fc = <Counter />;
+console.log(fc)
 const container = document.getElementById("root");
-Didact.mount(vDOM, container);
+Didact.mount(fc, container);
