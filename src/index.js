@@ -1,4 +1,4 @@
-function createElement(type, props, ...children) {
+function createVDOM(type, props, ...children) {
   return {
     type,
     props: {
@@ -26,7 +26,7 @@ function createDom(fiber) {
       ? document.createTextNode("")
       : document.createElement(fiber.type);
 
-  updateDom(dom, {}, fiber.props);
+  updateDOM(dom, {}, fiber.props);
 
   return dom;
 }
@@ -35,7 +35,7 @@ const isEvent = key => key.startsWith("on");
 const isProperty = key => key !== "children" && !isEvent(key);
 const isNew = (prev, next) => key => prev[key] !== next[key];
 const isGone = (prev, next) => key => !(key in next);
-function updateDom(dom, prevProps, nextProps) {
+function updateDOM(dom, prevProps, nextProps) {
   //Remove old or changed event listeners
   Object.keys(prevProps)
     .filter(isEvent)
@@ -71,45 +71,45 @@ function updateDom(dom, prevProps, nextProps) {
     });
 }
 
-function commitRoot() {
-  fibersToDelete.forEach(commitWork);
-  commitWork(wipRootFiber.child);
+function rootFiberToDOM() {
+  fibersToDelete.forEach(fiberToDOM);
+  fiberToDOM(wipRootFiber.child);
   currentRootFiber = wipRootFiber;
   wipRootFiber = null;
 }
 
-function commitWork(fiber) {
+function fiberToDOM(fiber) {
   if (!fiber) {
     return;
   }
 
-  let domParentFiber = fiber.parent;
+  let domParentFiber = fiber.parentFiber;
   while (!domParentFiber.dom) {
-    domParentFiber = domParentFiber.parent;
+    domParentFiber = domParentFiber.parentFiber;
   }
   const domParent = domParentFiber.dom;
 
   if (fiber.effectTag === "PLACEMENT" && fiber.dom != null) {
     domParent.appendChild(fiber.dom);
   } else if (fiber.effectTag === "UPDATE" && fiber.dom != null) {
-    updateDom(fiber.dom, fiber.oldFiber.props, fiber.props);
+    updateDOM(fiber.dom, fiber.oldFiber.props, fiber.props);
   } else if (fiber.effectTag === "DELETION") {
-    commitDeletion(fiber, domParent);
+    deleteDOM(fiber, domParent);
   }
 
-  commitWork(fiber.child);
-  commitWork(fiber.sibling);
+  fiberToDOM(fiber.child);
+  fiberToDOM(fiber.sibling);
 }
 
-function commitDeletion(fiber, domParent) {
+function deleteDOM(fiber, domParent) {
   if (fiber.dom) {
     domParent.removeChild(fiber.dom);
   } else {
-    commitDeletion(fiber.child, domParent);
+    deleteDOM(fiber.child, domParent);
   }
 }
 
-function render(vDOM, container) {
+function mount(vDOM, container) {
   wipRootFiber = {
     dom: container,
     props: {
@@ -129,12 +129,12 @@ let fibersToDelete = null;
 function workLoop(deadline) {
   let shouldYield = false;
   while (nextFiber && !shouldYield) {
-    nextFiber = performUnitOfWork(nextFiber);
+    nextFiber = doFiber(nextFiber);
     shouldYield = deadline.timeRemaining() < 1;
   }
 
   if (!nextFiber && wipRootFiber) {
-    commitRoot();
+    rootFiberToDOM();
   }
 
   requestIdleCallback(workLoop);
@@ -142,7 +142,7 @@ function workLoop(deadline) {
 
 requestIdleCallback(workLoop);
 
-function performUnitOfWork(fiber) {
+function doFiber(fiber) {
   const isFunctionComponent = fiber.type instanceof Function;
   if (isFunctionComponent) {
     updateFunctionComponent(fiber);
@@ -157,14 +157,14 @@ function performUnitOfWork(fiber) {
     if (nextFiber.sibling) {
       return nextFiber.sibling;
     }
-    nextFiber = nextFiber.parent;
+    nextFiber = nextFiber.parentFiber;
   }
 }
 
 let wipFiber = null;
 let hookIndex = null;
 
-// 传入 fiber,完成 diff
+// 传入 fiber,完成 diffAndPatch
 function updateFunctionComponent(fiber) {
   wipFiber = fiber;
   hookIndex = 0;
@@ -173,7 +173,7 @@ function updateFunctionComponent(fiber) {
   // 当是 function component 时, fiber.type 就是这个函数,比如 Counter(){}
   // children 就是 vdom
   const children = [fiber.type(fiber.props)];
-  reconcileChildren(fiber, children);
+  diffAndPatch(fiber, children);
 }
 
 function useState(initial) {
@@ -214,10 +214,10 @@ function updateHostComponent(fiber) {
   if (!fiber.dom) {
     fiber.dom = createDom(fiber);
   }
-  reconcileChildren(fiber, fiber.props.children);
+  diffAndPatch(fiber, fiber.props.children);
 }
 
-function reconcileChildren(wipFiber, vDOMs) {
+function diffAndPatch(wipFiber, vDOMs) {
   let index = 0;
   let oldFiber = wipFiber.oldFiber && wipFiber.oldFiber.child;
   let prevSibling = null;
@@ -233,7 +233,7 @@ function reconcileChildren(wipFiber, vDOMs) {
         type: oldFiber.type,
         props: vDOM.props,
         dom: oldFiber.dom,
-        parent: wipFiber,
+        parentFiber: wipFiber,
         oldFiber: oldFiber,
         effectTag: "UPDATE"
       };
@@ -243,7 +243,7 @@ function reconcileChildren(wipFiber, vDOMs) {
         type: vDOM.type,
         props: vDOM.props,
         dom: null,
-        parent: wipFiber,
+        parentFiber: wipFiber,
         oldFiber: null,
         effectTag: "PLACEMENT"
       };
@@ -269,21 +269,23 @@ function reconcileChildren(wipFiber, vDOMs) {
 }
 
 const Didact = {
-  createElement,
-  render,
+  createVDOM,
+  mount,
   useState
 };
 
-/** @jsx Didact.createElement */
+/** @jsx Didact.createVDOM */
 function Counter() {
   const [state, setState] = Didact.useState(1);
   const [state2, setState2] = Didact.useState(1);
 
   return (
     <div>
+     Example 1: explains why we need queue in useState
     <h1 onClick={() => {setState(c => c + 1); setState(c => c + 1);}} style="user-select: none">
       Count: {state}
     </h1>
+    Example  2:
     <h1 onClick={() => setState2(c => c + 1)} style="user-select: none">
       Count: {state2}
     </h1>
@@ -292,4 +294,4 @@ function Counter() {
 }
 const vDOM = <Counter />;
 const container = document.getElementById("root");
-Didact.render(vDOM, container);
+Didact.mount(vDOM, container);
