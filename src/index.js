@@ -27,21 +27,13 @@ function createTextVNode(text) {
   };
 }
 
-function createDom(fiber) {
-  const dom =
-    fiber.type == "TEXT_ELEMENT"
-      ? document.createTextNode("")
-      : document.createElement(fiber.type);
-
-  updateDOM(dom, {}, fiber.props);
-
-  return dom;
-}
+  
 
 const isEvent = key => key.startsWith("on");
 const isProperty = key => key !== "children" && !isEvent(key);
 const isNew = (prev, next) => key => prev[key] !== next[key];
 const isGone = (prev, next) => key => !(key in next);
+
 function updateDOM(dom, prevProps, nextProps) {
   //Remove old or changed event listeners
   Object.keys(prevProps)
@@ -78,13 +70,7 @@ function updateDOM(dom, prevProps, nextProps) {
     });
 }
 
-function rootFiberToDOM() {
-  fibersToDelete.forEach(fiberToDOM);
-  fiberToDOM(wipRootFiber.child);
-  currentRootFiber = wipRootFiber;
-  wipRootFiber = null;
-}
-
+ 
 // 这个函数主要是利用在 fiber diff 后的信息.
 function fiberToDOM(fiber) {
   if (!fiber) {
@@ -142,7 +128,10 @@ function workLoop(deadline) {
   }
 
   if (!nextFiber && wipRootFiber) {
-    rootFiberToDOM();
+    fibersToDelete.forEach(fiberToDOM);
+    fiberToDOM(wipRootFiber.child);
+    currentRootFiber = wipRootFiber;
+    wipRootFiber = null;
   }
 
   requestIdleCallback(workLoop);
@@ -183,14 +172,20 @@ function updateFunctionComponent(fiber) {
   // console.log(fiber.props,fiber.type)
   // 当是 function component 时, fiber.type 就是这个函数,比如 Counter(){}
   // children 就是 vdom
-  const childrenVDOMs = [fiber.type(fiber.props)];
+  const func_vNodes = [fiber.type(fiber.props)];
 
-  diffAndPatch(fiber, childrenVDOMs);
+  diffAndPatch(fiber, func_vNodes);
 }
 
 function updateHostComponent(fiber) {
   if (!fiber.dom) {
-    fiber.dom = createDom(fiber);
+    const dom =
+    fiber.type == "TEXT_ELEMENT"
+      ? document.createTextNode("")
+      : document.createElement(fiber.type);
+      updateDOM(dom, {}, fiber.props);
+
+    fiber.dom = dom;
   }
   diffAndPatch(fiber, fiber.props.children);
 }
@@ -229,13 +224,13 @@ function useState(initial) {
   return [hook.state, setState];
 }
 
-function diffAndPatch(wipFiber, vDOMs) {
+function diffAndPatch(wipFiber, vNodes) {
   let index = 0;
   let oldFiber = wipFiber.oldFiber && wipFiber.oldFiber.child;
   let prevSibling = null;
 
-  while (index < vDOMs.length || oldFiber != null) {
-    const vDOM = vDOMs[index];
+  while (index < vNodes.length || oldFiber != null) {
+    const vDOM = vNodes[index];
     let newFiber = null;
 
     const sameType = oldFiber && vDOM && vDOM.type == oldFiber.type;
