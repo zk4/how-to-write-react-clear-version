@@ -13,8 +13,7 @@ function createVNode(type, props, ...children) {
       )
     }
   };
-  console.log("vodm",vdom)
-  return vdom;
+   return vdom;
 }
 
 function createTextVNode(text) {
@@ -30,12 +29,22 @@ function createTextVNode(text) {
   
 
 const isEvent = key => key.startsWith("on");
-const isProperty = key => key !== "children" && !isEvent(key);
-const isNew = (prev, next) => key => prev[key] !== next[key];
-const isGone = (prev, next) => key => !(key in next);
 
+// 就是这么粗暴, key 不是 children 并且不是以 on 开头的都是 proeperty.
+const isProperty = key => key !== "children" && !isEvent(key);
+
+// 下面这个的写法可以学习一下
+// 两个 obj 里相同的 key 如果不一样,返回 true
+// 那 a = {a:2} b = {a:2},就会返 false
+
+const isNew = (prev, next) => key => prev[key] !== next[key];
+ 
 function updateDOM(dom, prevProps, nextProps) {
-  //Remove old or changed event listeners
+
+  // 移除事件监听
+  // 当：
+  // 1. 是 event 的 props
+  // 2. 且(旧有新没有 或者 新旧不相同)
   Object.keys(prevProps)
     .filter(isEvent)
     .filter(key => !(key in nextProps) || isNew(prevProps, nextProps)(key))
@@ -47,7 +56,7 @@ function updateDOM(dom, prevProps, nextProps) {
   // Remove old properties
   Object.keys(prevProps)
     .filter(isProperty)
-    .filter(isGone(prevProps, nextProps))
+    .filter(key => !(key in nextProps))
     .forEach(name => {
       dom[name] = "";
     });
@@ -55,8 +64,10 @@ function updateDOM(dom, prevProps, nextProps) {
   // Set new or changed properties
   Object.keys(nextProps)
     .filter(isProperty)
+    // 因为前面已经移除了旧有新没有的,只剩下新的了.
     .filter(isNew(prevProps, nextProps))
     .forEach(name => {
+      console.log(name)
       dom[name] = nextProps[name];
     });
 
@@ -196,7 +207,8 @@ function useState(initial) {
     wipFiber.oldFiber.hooks &&
     wipFiber.oldFiber.hooks[hookIndex];  // 要么这个值, 要么 undefined 或 null
   const hook = {
-    state: oldHook?.state || initial,
+    // state: oldHook?.state || initial, 注意, 不能用这种写法. 如果值就是 false 是有 bug 的.
+    state: oldHook ? oldHook.state : initial,
     // 这里之所以要用 array (说是 queue, JS 哪有真正的 queue). 是因为 setState 方法在调用时,是在 event 派发阶段. 是异步的. 有可能会有多个事件过来. 会调用多次 setState ,比如以下情况
     // <h1 onClick={() => {setState(c => c + 1); setState(c => c + 1);}} style="user-select: none">
 
@@ -285,18 +297,28 @@ const Didact = {
 function Counter() {
   const [state, setState] = Didact.useState(1);
   const [state2, setState2] = Didact.useState(1);
-
+  const [state3, setState3] = Didact.useState(true);
   return (
     <div align="middle">
      Example 1: explains why we need queue in useState
-    <h1 onClick={() => {setState(c => c + 1); setState(c => c + 1);}} style="user-select: none">
+    <h1   onClick={() => {setState(c => c + 1); setState(c => c + 1);}} style="user-select: none">
       Count: {state}
     </h1>
     Example  2:
     <h1 onClick={() => setState2(c => c + 1)} style="user-select: none">
       Count: {state2}
     </h1>
+    Example  3:
+    <h1 onClick={() => setState3(c => !c)} style="user-select: none">
+
+      Count: {state3}
+       
+       {
+        state3==true?<h1>To be deleted!</h1>:null
+       }
+    </h1>
     </div>
+    
   );
 }
 const vdom = <Counter />;
