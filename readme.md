@@ -7,6 +7,3 @@ I made a few tweak to make it clear for whom want to learn how to write their ow
 
 React dependencies is for easy setup for JSX. Just use it.
  
-
-
-

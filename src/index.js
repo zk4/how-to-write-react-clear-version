@@ -2,7 +2,7 @@
 // children 之所以在 props 里.也是因为 react 里就是这样写的. 也对应最早的 h 函数.
 // type 在函数式组件里, Babel 会将函数本身赋值给 type
 // props 指的是 JSX 上的 attribute 
-// 从第3 个起后的参数都是 childlren  vDOM
+// 从第3 个起，后面参数都是 childlren  vDOM
 function createVNode(type, props, ...children) {
   const vdom = {
     type,
@@ -182,10 +182,9 @@ function updateFunctionComponent(fiber) {
   wipFiber.hooks = [];
   // console.log(fiber.props,fiber.type)
   // 当是 function component 时, fiber.type 就是这个函数,比如 Counter(){}
-  // children 就是 vdom
-  const func_vNodes = [fiber.type(fiber.props)];
-
-  diffAndPatch(fiber, func_vNodes);
+  // children 就是 vdom, 也就是 function component 的返回
+  const children = [fiber.type(fiber.props)];
+  diffAndPatch(fiber, children);
 }
 
 function updateHostComponent(fiber) {
@@ -238,47 +237,58 @@ function useState(initial) {
 
 function diffAndPatch(wipFiber, vNodes) {
   let index = 0;
-  let oldFiber = wipFiber.oldFiber && wipFiber.oldFiber.child;
+  //  这里先从 当前 fiber 快照的 child 开始
+  // 最终要更新 fiber 上的信息，以供一次性操作完 DOM
+  let targetFiber = wipFiber.oldFiber && wipFiber.oldFiber.child;
   let prevSibling = null;
 
-  while (index < vNodes.length || oldFiber != null) {
-    const vDOM = vNodes[index];
+  while (index < vNodes.length || targetFiber != null) {
+    const vNode = vNodes[index];
     let newFiber = null;
 
-    const sameType = oldFiber && vDOM && vDOM.type == oldFiber.type;
+    const sameType = targetFiber && vNode && vNode.type == targetFiber.type;
 
+    // 这里可以做优化，不是看到 type 相同，就一定 update
     if (sameType) {
       newFiber = {
-        type: oldFiber.type,
-        props: vDOM.props,
-        dom: oldFiber.dom,
-        parentFiber: wipFiber,
-        oldFiber: oldFiber,
+        type: vNode.type,
+        props: vNode.props,
+        // 以下是 fiber 对比 vNode 多出的属性
+        dom: targetFiber.dom,  // 因为是 update，会复用 dom，只是 update Attribute
+        parentFiber: wipFiber,  
+        oldFiber: targetFiber,
         effectTag: "UPDATE"
       };
     }
-    if (vDOM && !sameType) {
+    // 这里一样可以优化，只是在这里，发现不是同样的 type 就直接替换了
+    if (vNode && !sameType) {
       newFiber = {
-        type: vDOM.type,
-        props: vDOM.props,
+        type: vNode.type,
+        props: vNode.props,
         dom: null,
         parentFiber: wipFiber,
         oldFiber: null,
         effectTag: "PLACEMENT"
       };
     }
-    if (oldFiber && !sameType) {
-      oldFiber.effectTag = "DELETION";
-      fibersToDelete.push(oldFiber);
+    // 这里 vNode 肯定为 null 了，如果 targetFiber 也存在，那就删了
+    if (targetFiber && !sameType) {
+      targetFiber.effectTag = "DELETION";
+      fibersToDelete.push(targetFiber);
     }
 
-    if (oldFiber) {
-      oldFiber = oldFiber.sibling;
+    if (targetFiber) {
+      //  child 搞完就搞下一个节点，也就是 sibling
+      targetFiber = targetFiber.sibling;
     }
 
+    
     if (index === 0) {
+      // 更新 child
       wipFiber.child = newFiber;
-    } else if (vDOM) {
+    } else if (vNode) {
+      // 现在已不是 child，且 vNode 要存在
+      // prevSibling 是在下面的赋的值，也就是上一个 newFiber 节点
       prevSibling.sibling = newFiber;
     }
 
@@ -300,21 +310,22 @@ function Counter() {
   const [state3, setState3] = Didact.useState(true);
   return (
     <div align="middle">
-     Example 1: explains why we need queue in useState
+     {/* Example 1: explains why we need queue in useState
+     <button onClick={() => {setState(c => c + 1);}} > click me</button> 
     <h1   onClick={() => {setState(c => c + 1); setState(c => c + 1);}} style="user-select: none">
       Count: {state}
     </h1>
     Example  2:
     <h1 onClick={() => setState2(c => c + 1)} style="user-select: none">
       Count: {state2}
-    </h1>
+    </h1> */}
     Example  3:
     <h1 onClick={() => setState3(c => !c)} style="user-select: none">
 
       Count: {state3}
-       
+     
        {
-        state3==true?<h1>To be deleted!</h1>:null
+        state3==true?<h2>To be deleted!</h2>:null
        }
     </h1>
     </div>
@@ -322,6 +333,5 @@ function Counter() {
   );
 }
 const vdom = <Counter />;
-console.log(vdom)
-const container = document.getElementById("root");
+ const container = document.getElementById("root");
 Didact.mount(vdom, container);
